@@ -1,0 +1,575 @@
+module Main exposing (..)
+
+import Animator
+import Animator.Inline
+import Browser
+import Browser.Navigation as Navigation
+import Color
+import Dict exposing (Dict)
+import Element as E exposing (Element)
+import Element.Background as Background
+import Element.Border as Border
+import Element.Font as Font
+import Element.Input as Input
+import Html.Attributes as Attr
+import Json.Decode as D
+import Process
+import Random
+import Random.List
+import Set exposing (Set)
+import Task
+import Time
+import Url exposing (Url)
+
+
+type alias Assets =
+    { yak : String }
+
+
+type alias Model =
+    { assets : Assets
+    , animatePressed : AnimatePressed
+    , animateBackground : AnimateState
+    , animateState : AnimateState
+    , puzzle : Puzzle
+    }
+
+
+type Puzzle
+    = Puzzle (List Bool)
+
+
+type alias AnimatePressed =
+    Animator.Timeline Pressed
+
+
+type Pressed
+    = All
+    | Attempts (Set Int)
+    | Solved Int
+
+
+type alias AnimateState =
+    Animator.Timeline State
+
+
+type State
+    = Idle
+    | Correct
+    | Wrong
+
+
+main : Program D.Value Model Msg
+main =
+    Browser.application
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        , onUrlRequest = onUrlRequest
+        , onUrlChange = onUrlChange
+        }
+
+
+type alias Flags =
+    { assets : Assets
+    }
+
+
+init : D.Value -> Url -> Navigation.Key -> ( Model, Cmd Msg )
+init flags _ _ =
+    let
+        defaultModel =
+            { assets = { yak = "" }
+            , animatePressed = Animator.init All
+            , puzzle = Puzzle []
+            , animateBackground = Animator.init Idle
+            , animateState = Animator.init Correct
+            }
+    in
+    case D.decodeValue flagsDecoder flags of
+        Err _ ->
+            ( defaultModel, Cmd.none )
+
+        Ok { assets } ->
+            ( { defaultModel | assets = assets }
+            , Task.perform (\_ -> GeneratePuzzle 0) (Process.sleep 200)
+            )
+
+
+flagsDecoder : D.Decoder Flags
+flagsDecoder =
+    D.map Flags <|
+        D.field "assets" <|
+            D.map Assets
+                (D.field "Yak" D.string)
+
+
+view : Model -> Browser.Document Msg
+view model =
+    { title = "123"
+    , body =
+        [ E.layout
+            [ Background.color backgroundColor
+            , Font.family
+                [ Font.typeface "Patrick Hand"
+                , Font.sansSerif
+                ]
+            , E.paddingXY 5 50
+            , E.spacing 8
+            , E.clip
+            , animateBackgroundColor model.animateBackground
+            ]
+            (E.column
+                [ E.fill
+                    |> E.maximum 400
+                    |> E.width
+                , E.height E.fill
+                , E.centerX
+                ]
+                [ E.el
+                    [ E.centerX
+                    , Font.size 30
+                    ]
+                    (E.text "WIÄ VIEL?")
+                , animatedImages model
+                , E.column
+                    [ E.width E.fill
+                    , E.height (E.fillPortion 1)
+                    ]
+                    (List.range 1 9
+                        |> chunksOfLeft 3
+                        |> List.map (viewNumPadRow model.animatePressed)
+                    )
+                ]
+            )
+        ]
+    }
+
+
+animateBackgroundColor : AnimateState -> E.Attribute a
+animateBackgroundColor animateBackground =
+    E.htmlAttribute <|
+        Animator.Inline.backgroundColor animateBackground <|
+            \state ->
+                case state of
+                    Correct ->
+                        Color.lightGreen
+                            |> Color.toHsla
+                            |> (\c -> { c | lightness = 0.8 })
+                            |> Color.fromHsla
+
+                    Wrong ->
+                        Color.lightPurple
+                            |> Color.toHsla
+                            |> (\c -> { c | lightness = 0.8 })
+                            |> Color.fromHsla
+
+                    Idle ->
+                        backgroundColor
+                            |> E.toRgb
+                            |> Color.fromRgba
+
+
+animatedImages : Model -> Element msg
+animatedImages model =
+    E.column
+        [ E.width E.fill
+        , E.height (E.px 440)
+        , E.centerX
+        , E.centerY
+        , E.spaceEvenly
+        , E.htmlAttribute <|
+            Animator.Inline.xy model.animateState <|
+                \state ->
+                    case state of
+                        Correct ->
+                            { y =
+                                Animator.at -570
+                                    |> Animator.arriveSmoothly 1
+                                    |> Animator.withWobble 0
+                            , x = Animator.at 0
+                            }
+
+                        _ ->
+                            { y =
+                                Animator.at 0
+                                    |> Animator.arriveSmoothly 1
+                                    |> Animator.withWobble 0
+                            , x = Animator.at 0
+                            }
+        ]
+        (viewImages model.assets model.puzzle)
+
+
+viewImages : Assets -> Puzzle -> List (Element msg)
+viewImages assets (Puzzle ns) =
+    List.map (viewImage assets) ns
+        |> chunksOfLeft 3
+        |> List.map
+            (E.row
+                [ E.centerX
+                , E.centerY
+                , E.spacing 8
+                , E.padding 8
+                ]
+            )
+
+
+viewImage : Assets -> Bool -> Element msg
+viewImage assets visible =
+    if visible then
+        E.el
+            [ E.htmlAttribute (Attr.style "border-radius" "50%")
+            , Border.innerGlow
+                (Color.grey
+                    |> Color.toRgba
+                    |> E.fromRgb
+                )
+                3
+            , Color.lightGrey
+                |> Color.toRgba
+                |> E.fromRgb
+                |> Background.color
+            , E.centerX
+            , E.padding 2
+            , E.px 110
+                |> E.width
+            , E.px 110
+                |> E.height
+            , E.clip
+            ]
+        <|
+            E.image
+                [ E.centerX
+                , E.centerY
+                , Background.uncropped ""
+                ]
+                { src = assets.yak
+                , description = assets.yak
+                }
+
+    else
+        E.el
+            [ E.padding 2
+            , E.px 110
+                |> E.width
+            , E.px 110
+                |> E.height
+            ]
+            E.none
+
+
+viewNumPadRow : AnimatePressed -> List Int -> Element Msg
+viewNumPadRow animatePressed ns =
+    E.row
+        [ E.width E.fill
+        , E.height E.fill
+        , E.spacing 8
+        , E.padding 8
+        ]
+        (List.map (viewNum animatePressed) ns)
+
+
+viewNum : AnimatePressed -> Int -> Element Msg
+viewNum animatePressed n =
+    E.el [ E.width E.fill, E.height E.fill ] <|
+        Input.button
+            [ Font.size 60
+            , E.centerX
+            , E.centerY
+            , E.width E.fill
+            , E.height E.fill
+            , E.htmlAttribute <|
+                Animator.Inline.backgroundColor animatePressed <|
+                    \maybePressed ->
+                        case maybePressed of
+                            Solved x ->
+                                if x == n then
+                                    Color.lightGreen
+
+                                else
+                                    Color.lightPurple
+
+                            Attempts set ->
+                                if Set.member n set then
+                                    Color.lightPurple
+
+                                else
+                                    Color.lightBlue
+
+                            _ ->
+                                Color.lightBlue
+            , E.htmlAttribute <|
+                Animator.Inline.borderColor animatePressed <|
+                    \maybePressed ->
+                        case maybePressed of
+                            Attempts set ->
+                                if Set.member n set then
+                                    Color.purple
+
+                                else
+                                    Color.blue
+
+                            Solved x ->
+                                if x == n then
+                                    Color.green
+
+                                else
+                                    Color.purple
+
+                            _ ->
+                                Color.blue
+            , Border.solid
+            , Border.rounded 18
+            , Border.width 3
+            , E.htmlAttribute <|
+                Animator.Inline.opacity animatePressed <|
+                    \maybePressed ->
+                        case maybePressed of
+                            All ->
+                                Animator.at 0.5
+
+                            Solved x ->
+                                if x == n then
+                                    Animator.at 1
+
+                                else
+                                    Animator.at 0.2
+
+                            Attempts set ->
+                                if Set.member n set then
+                                    Animator.at 0.5
+
+                                else
+                                    Animator.at 1
+            , E.htmlAttribute <|
+                Animator.Inline.xy animatePressed <|
+                    \maybePressed ->
+                        case maybePressed of
+                            All ->
+                                { x = Animator.at 0, y = Animator.at 8 }
+
+                            Solved x ->
+                                { x = Animator.at 0, y = Animator.at 8 }
+
+                            Attempts set ->
+                                if Set.member n set then
+                                    { x = Animator.at 0, y = Animator.at 8 }
+
+                                else
+                                    { x = Animator.at 0, y = Animator.at 0 }
+            , E.htmlAttribute <|
+                Animator.Inline.style animatePressed
+                    "box-shadow"
+                    (\float ->
+                        let
+                            str =
+                                String.fromFloat float
+                        in
+                        "0px " ++ str ++ "px 0px 0px " ++ Color.toCssString Color.blue
+                    )
+                <|
+                    \maybePressed ->
+                        case maybePressed of
+                            All ->
+                                Animator.at 0
+
+                            Solved x ->
+                                Animator.at 0
+
+                            Attempts set ->
+                                if Set.member n set then
+                                    Animator.at 0
+
+                                else
+                                    Animator.at 8
+            ]
+            { onPress =
+                case Animator.current animatePressed of
+                    All ->
+                        Nothing
+
+                    Solved x ->
+                        Nothing
+
+                    Attempts set ->
+                        if Set.member n set then
+                            Nothing
+
+                        else
+                            Just (NumPressed n)
+            , label =
+                String.fromInt n
+                    |> E.text
+                    |> E.el [ E.centerX, E.centerY ]
+            }
+
+
+type Msg
+    = NoOp
+    | NumPressed Int
+    | Tick Time.Posix
+    | NewPuzzle Puzzle
+    | GeneratePuzzle Int
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        NoOp ->
+            ( model, Cmd.none )
+
+        GeneratePuzzle n ->
+            ( model
+            , case List.range 1 9 |> List.filter (\x -> x /= n) of
+                [] ->
+                    Cmd.none
+
+                x :: xs ->
+                    Random.uniform x xs
+                        |> Random.andThen
+                            (\y ->
+                                List.repeat y True
+                                    ++ List.repeat (9 - y) False
+                                    |> Random.List.shuffle
+                            )
+                        |> Random.map Puzzle
+                        |> Random.generate NewPuzzle
+            )
+
+        NewPuzzle puzzle ->
+            ( { model
+                | puzzle = puzzle
+                , animatePressed =
+                    Animator.queue
+                        [ Animator.event Animator.quickly <| Attempts Set.empty ]
+                        model.animatePressed
+                , animateState =
+                    Animator.queue [ Animator.event Animator.verySlowly Idle ] model.animateState
+              }
+            , Cmd.none
+            )
+
+        NumPressed n ->
+            let
+                newState =
+                    if correct n model.puzzle then
+                        Correct
+
+                    else
+                        Wrong
+
+                newPressed =
+                    case Animator.current model.animatePressed of
+                        All ->
+                            All
+
+                        Solved x ->
+                            Solved x
+
+                        Attempts set ->
+                            case newState of
+                                Correct ->
+                                    Solved n
+
+                                _ ->
+                                    Attempts (Set.insert n set)
+            in
+            case newState of
+                Correct ->
+                    ( { model
+                        | animatePressed =
+                            Animator.interrupt [ Animator.event Animator.quickly newPressed ] model.animatePressed
+                        , animateBackground =
+                            Animator.interrupt
+                                [ Animator.event Animator.verySlowly Correct
+                                , Animator.wait <| Animator.millis 3500
+                                , Animator.event Animator.verySlowly Idle
+                                ]
+                                model.animateBackground
+                        , animateState =
+                            Animator.interrupt
+                                [ Animator.wait <| Animator.millis 1500
+                                , Animator.event Animator.verySlowly Correct
+                                ]
+                                model.animateState
+                      }
+                    , Task.perform (\_ -> GeneratePuzzle n) (Process.sleep 3500)
+                    )
+
+                _ ->
+                    ( { model
+                        | animatePressed =
+                            Animator.interrupt [ Animator.event Animator.quickly newPressed ] model.animatePressed
+                        , animateBackground =
+                            Animator.interrupt
+                                [ Animator.event Animator.verySlowly newState
+                                , Animator.wait Animator.verySlowly
+                                , Animator.event Animator.verySlowly Idle
+                                ]
+                                model.animateBackground
+                      }
+                    , Cmd.none
+                    )
+
+        Tick newTime ->
+            ( Animator.update newTime animator model, Cmd.none )
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Animator.toSubscription Tick model animator
+
+
+animator : Animator.Animator Model
+animator =
+    Animator.animator
+        |> Animator.watching
+            .animateState
+            (\newAnimateState model ->
+                { model | animateState = newAnimateState }
+            )
+        |> Animator.watching
+            .animateBackground
+            (\newAnimateBackground model ->
+                { model | animateBackground = newAnimateBackground }
+            )
+        |> Animator.watching
+            .animatePressed
+            (\newAnimatePressed model ->
+                { model | animatePressed = newAnimatePressed }
+            )
+
+
+onUrlRequest : Browser.UrlRequest -> Msg
+onUrlRequest _ =
+    NoOp
+
+
+onUrlChange : Url -> Msg
+onUrlChange _ =
+    NoOp
+
+
+backgroundColor : E.Color
+backgroundColor =
+    E.rgb 0.89 0.89 0.89
+
+
+correct : Int -> Puzzle -> Bool
+correct n (Puzzle puzzle) =
+    List.length (List.filter identity puzzle)
+        == n
+
+
+chunksOfLeft : Int -> List a -> List (List a)
+chunksOfLeft k xs =
+    if k <= 0 then
+        []
+
+    else if List.length xs > k then
+        List.take k xs :: chunksOfLeft k (List.drop k xs)
+
+    else
+        [ xs ]
