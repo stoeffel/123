@@ -30,6 +30,7 @@ type alias Model =
     , animateBackground : AnimateState
     , animateState : AnimateState
     , puzzle : Puzzle
+    , showSettings : Bool
     }
 
 
@@ -79,6 +80,7 @@ init flags _ _ =
             , puzzle = Puzzle.init
             , animateBackground = Animator.init Idle
             , animateState = Animator.init Correct
+            , showSettings = False
             }
     in
     case D.decodeValue flagsDecoder flags of
@@ -121,11 +123,14 @@ view model =
                 , E.height E.fill
                 , E.centerX
                 ]
-                [ E.el
-                    [ E.centerX
-                    , Font.size 30
+                [ E.row [ E.width E.fill ]
+                    [ E.el
+                        [ E.centerX
+                        , Font.size 30
+                        ]
+                        (E.text "WIÄ VIEL?")
+                    , viewSettingsButton model.showSettings (Puzzle.maxNum model.puzzle)
                     ]
-                    (E.text "WIÄ VIEL?")
                 , E.column
                     [ E.width E.fill
                     , E.height (E.px 440)
@@ -141,7 +146,7 @@ view model =
                     ]
                     (model.puzzle
                         |> Puzzle.viewElements (viewNum model.animatePressed)
-                        |> Puzzle.chunked
+                        |> Puzzle.chunked model.puzzle
                         |> List.map (viewNumPadRow model.animatePressed)
                     )
                 ]
@@ -150,10 +155,27 @@ view model =
     }
 
 
+viewSettingsButton : Bool -> Int -> Element Msg
+viewSettingsButton showSettings value =
+    Input.button
+        [ E.alignRight
+        , E.below <|
+            if showSettings then
+                E.el [ E.alignRight ]
+                    (Puzzle.settings value AdjustValue)
+
+            else
+                E.none
+        ]
+        { onPress = Just ToggleSettings
+        , label = E.text "*"
+        }
+
+
 viewImages : Puzzle -> List (Element msg)
 viewImages puzzle =
-    Puzzle.viewElements viewImage puzzle
-        |> Puzzle.chunked
+    Puzzle.viewElements (viewImage (Puzzle.chunks puzzle)) puzzle
+        |> Puzzle.chunked puzzle
         |> List.map
             (EK.row
                 [ E.centerX
@@ -164,11 +186,11 @@ viewImages puzzle =
             )
 
 
-viewImage : Maybe Asset -> Puzzle.Visibility -> Int -> Element msg
-viewImage maybeAsset visible _ =
+viewImage : Int -> Maybe Asset -> Puzzle.Visibility -> Int -> Element msg
+viewImage chunks maybeAsset visible _ =
     let
         size =
-            E.px (330 // Puzzle.chunks)
+            E.px (330 // chunks)
     in
     case visible of
         Puzzle.Visible ->
@@ -274,6 +296,8 @@ type Msg
     | Tick Time.Posix
     | NewPuzzle Puzzle
     | GeneratePuzzle Int
+    | ToggleSettings
+    | AdjustValue Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -366,6 +390,14 @@ update msg model =
                       }
                     , Cmd.none
                     )
+
+        ToggleSettings ->
+            ( { model | showSettings = not model.showSettings }, Cmd.none )
+
+        AdjustValue n ->
+            ( { model | puzzle = Puzzle.adjustNum n model.puzzle }
+            , Task.perform (\_ -> GeneratePuzzle 0) (Process.sleep 0)
+            )
 
         Tick newTime ->
             ( Animator.update newTime animator model, Cmd.none )
