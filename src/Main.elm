@@ -133,7 +133,7 @@ view model =
                     ]
                 , E.column
                     [ E.width E.fill
-                    , E.height (E.px 440)
+                    , E.height E.fill
                     , E.centerX
                     , E.centerY
                     , E.spaceEvenly
@@ -142,7 +142,10 @@ view model =
                     (viewImages model.puzzle)
                 , E.column
                     [ E.width E.fill
-                    , E.height (E.fillPortion 1)
+                    , E.fill
+                        |> E.maximum 440
+                        |> E.height
+                    , E.centerY
                     ]
                     (model.puzzle
                         |> Puzzle.viewElements (viewNum model.animatePressed)
@@ -159,6 +162,7 @@ viewSettingsButton : Bool -> Int -> Element Msg
 viewSettingsButton showSettings value =
     Input.button
         [ E.alignRight
+        , E.spacing 10
         , E.below <|
             if showSettings then
                 E.el [ E.alignRight ]
@@ -227,7 +231,9 @@ viewNumPadRow : AnimatePressed -> List ( String, Element msg ) -> Element msg
 viewNumPadRow animatePressed =
     EK.row
         [ E.width E.fill
-        , E.height E.fill
+        , E.fill
+            |> E.maximum 110
+            |> E.height
         , E.spacing 8
         , E.padding 8
         ]
