@@ -14,6 +14,7 @@ import Element.Input as Input
 import Html.Attributes as Attr
 import Json.Decode as D
 import Process
+import Puzzle exposing (Puzzle)
 import Random
 import Random.List
 import Set exposing (Set)
@@ -33,10 +34,6 @@ type alias Model =
     , animateState : AnimateState
     , puzzle : Puzzle
     }
-
-
-type Puzzle
-    = Puzzle (List Bool)
 
 
 type alias AnimatePressed =
@@ -82,7 +79,7 @@ init flags _ _ =
         defaultModel =
             { assets = { yak = "" }
             , animatePressed = Animator.init All
-            , puzzle = Puzzle []
+            , puzzle = Puzzle.init
             , animateBackground = Animator.init Idle
             , animateState = Animator.init Correct
             }
@@ -137,7 +134,8 @@ view model =
                     [ E.width E.fill
                     , E.height (E.fillPortion 1)
                     ]
-                    (List.range 1 9
+                    (model.puzzle
+                        |> Puzzle.viewElements (viewNum model.animatePressed)
                         |> chunksOfLeft 3
                         |> List.map (viewNumPadRow model.animatePressed)
                     )
@@ -203,8 +201,8 @@ animatedImages model =
 
 
 viewImages : Assets -> Puzzle -> List (Element msg)
-viewImages assets (Puzzle ns) =
-    List.map (viewImage assets) ns
+viewImages assets puzzle =
+    Puzzle.viewElements (viewImage assets) puzzle
         |> chunksOfLeft 3
         |> List.map
             (E.row
@@ -216,63 +214,63 @@ viewImages assets (Puzzle ns) =
             )
 
 
-viewImage : Assets -> Bool -> Element msg
-viewImage assets visible =
-    if visible then
-        E.el
-            [ E.htmlAttribute (Attr.style "border-radius" "50%")
-            , Border.innerGlow
-                (Color.grey
+viewImage : Assets -> Puzzle.Visibility -> Int -> Element msg
+viewImage assets visible _ =
+    case visible of
+        Puzzle.Visible ->
+            E.el
+                [ E.htmlAttribute (Attr.style "border-radius" "50%")
+                , Border.innerGlow
+                    (Color.grey
+                        |> Color.toRgba
+                        |> E.fromRgb
+                    )
+                    3
+                , Color.lightGrey
                     |> Color.toRgba
                     |> E.fromRgb
-                )
-                3
-            , Color.lightGrey
-                |> Color.toRgba
-                |> E.fromRgb
-                |> Background.color
-            , E.centerX
-            , E.padding 2
-            , E.px 110
-                |> E.width
-            , E.px 110
-                |> E.height
-            , E.clip
-            ]
-        <|
-            E.image
-                [ E.centerX
-                , E.centerY
-                , Background.uncropped ""
+                    |> Background.color
+                , E.centerX
+                , E.padding 2
+                , E.px 110
+                    |> E.width
+                , E.px 110
+                    |> E.height
+                , E.clip
                 ]
-                { src = assets.yak
-                , description = assets.yak
-                }
+            <|
+                E.image
+                    [ E.centerX
+                    , E.centerY
+                    , Background.uncropped ""
+                    ]
+                    { src = assets.yak
+                    , description = assets.yak
+                    }
 
-    else
-        E.el
-            [ E.padding 2
-            , E.px 110
-                |> E.width
-            , E.px 110
-                |> E.height
-            ]
-            E.none
+        Puzzle.Hidden ->
+            E.el
+                [ E.padding 2
+                , E.px 110
+                    |> E.width
+                , E.px 110
+                    |> E.height
+                ]
+                E.none
 
 
-viewNumPadRow : AnimatePressed -> List Int -> Element Msg
-viewNumPadRow animatePressed ns =
+viewNumPadRow : AnimatePressed -> List (Element msg) -> Element msg
+viewNumPadRow animatePressed =
     E.row
         [ E.width E.fill
         , E.height E.fill
         , E.spacing 8
         , E.padding 8
         ]
-        (List.map (viewNum animatePressed) ns)
 
 
-viewNum : AnimatePressed -> Int -> Element Msg
-viewNum animatePressed n =
+viewNum : AnimatePressed -> Puzzle.Visibility -> Int -> Element Msg
+viewNum animatePressed _ n =
     E.el [ E.width E.fill, E.height E.fill ] <|
         Input.button
             [ Font.size 60
@@ -422,20 +420,12 @@ update msg model =
 
         GeneratePuzzle n ->
             ( model
-            , case List.range 1 9 |> List.filter (\x -> x /= n) of
-                [] ->
+            , case Puzzle.generate model.puzzle of
+                Nothing ->
                     Cmd.none
 
-                x :: xs ->
-                    Random.uniform x xs
-                        |> Random.andThen
-                            (\y ->
-                                List.repeat y True
-                                    ++ List.repeat (9 - y) False
-                                    |> Random.List.shuffle
-                            )
-                        |> Random.map Puzzle
-                        |> Random.generate NewPuzzle
+                Just generate ->
+                    Random.generate NewPuzzle generate
             )
 
         NewPuzzle puzzle ->
@@ -454,7 +444,7 @@ update msg model =
         NumPressed n ->
             let
                 newState =
-                    if correct n model.puzzle then
+                    if Puzzle.correct n model.puzzle then
                         Correct
 
                     else
@@ -555,12 +545,6 @@ onUrlChange _ =
 backgroundColor : E.Color
 backgroundColor =
     E.rgb 0.89 0.89 0.89
-
-
-correct : Int -> Puzzle -> Bool
-correct n (Puzzle puzzle) =
-    List.length (List.filter identity puzzle)
-        == n
 
 
 chunksOfLeft : Int -> List a -> List (List a)
