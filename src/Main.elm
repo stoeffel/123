@@ -141,7 +141,7 @@ view model =
                     ]
                     (model.puzzle
                         |> Puzzle.viewElements (viewNum model.animatePressed)
-                        |> chunksOfLeft 3
+                        |> Puzzle.chunked
                         |> List.map (viewNumPadRow model.animatePressed)
                     )
                 ]
@@ -153,7 +153,7 @@ view model =
 viewImages : Puzzle -> List (Element msg)
 viewImages puzzle =
     Puzzle.viewElements viewImage puzzle
-        |> chunksOfLeft 3
+        |> Puzzle.chunked
         |> List.map
             (EK.row
                 [ E.centerX
@@ -166,6 +166,10 @@ viewImages puzzle =
 
 viewImage : Maybe Asset -> Puzzle.Visibility -> Int -> Element msg
 viewImage maybeAsset visible _ =
+    let
+        size =
+            E.px (330 // Puzzle.chunks)
+    in
     case visible of
         Puzzle.Visible ->
             E.el
@@ -182,10 +186,8 @@ viewImage maybeAsset visible _ =
                     |> Background.color
                 , E.centerX
                 , E.padding 2
-                , E.px 110
-                    |> E.width
-                , E.px 110
-                    |> E.height
+                , E.width size
+                , E.height size
                 , E.clip
                 ]
                 (Assets.view maybeAsset)
@@ -193,10 +195,8 @@ viewImage maybeAsset visible _ =
         Puzzle.Hidden ->
             E.el
                 [ E.padding 2
-                , E.px 110
-                    |> E.width
-                , E.px 110
-                    |> E.height
+                , E.width size
+                , E.height size
                 ]
                 E.none
 
@@ -409,18 +409,6 @@ onUrlChange _ =
 backgroundColor : E.Color
 backgroundColor =
     E.rgb 0.89 0.89 0.89
-
-
-chunksOfLeft : Int -> List a -> List (List a)
-chunksOfLeft k xs =
-    if k <= 0 then
-        []
-
-    else if List.length xs > k then
-        List.take k xs :: chunksOfLeft k (List.drop k xs)
-
-    else
-        [ xs ]
 
 
 animateXY : AnimateState -> E.Attribute a

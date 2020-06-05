@@ -1,6 +1,8 @@
 module Puzzle exposing
     ( Puzzle
     , Visibility(..)
+    , chunked
+    , chunks
     , correct
     , generate
     , init
@@ -27,6 +29,28 @@ type Visibility
     | Hidden
 
 
+maxNum : Int
+maxNum =
+    9
+
+
+chunks : Int
+chunks =
+    3
+
+
+chunked : List a -> List (List a)
+chunked xs =
+    if chunks <= 0 then
+        []
+
+    else if List.length xs > chunks then
+        List.take chunks xs :: chunked (List.drop chunks xs)
+
+    else
+        [ xs ]
+
+
 viewElements :
     (Maybe Asset -> Visibility -> Int -> Element msg)
     -> Puzzle
@@ -51,7 +75,7 @@ generate assets p =
         n =
             correctAnswer p
     in
-    case List.range 1 9 |> List.filter (\x -> x /= n) of
+    case List.range 1 maxNum |> List.filter (\x -> x /= n) of
         [] ->
             Nothing
 
@@ -63,7 +87,7 @@ generate assets p =
                         |> Random.andThen
                             (\y ->
                                 List.repeat y True
-                                    ++ List.repeat (9 - y) False
+                                    ++ List.repeat (maxNum - y) False
                                     |> Random.List.shuffle
                             )
                     )
