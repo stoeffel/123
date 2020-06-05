@@ -124,7 +124,11 @@ view model =
                 , E.height E.fill
                 , E.centerX
                 ]
-                [ E.row [ E.width E.fill ]
+                [ E.row
+                    [ E.width E.fill
+                    , E.paddingXY 40 0
+                    , E.centerY
+                    ]
                     [ E.el
                         [ E.centerX
                         , Font.size 30
