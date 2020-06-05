@@ -2,10 +2,10 @@ module Main exposing (..)
 
 import Animator
 import Animator.Inline
+import Assets exposing (Asset, Assets)
 import Browser
 import Browser.Navigation as Navigation
 import Color exposing (Color)
-import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
@@ -21,10 +21,6 @@ import Set exposing (Set)
 import Task
 import Time
 import Url exposing (Url)
-
-
-type alias Assets =
-    { yak : String }
 
 
 type alias Model =
@@ -77,7 +73,7 @@ init : D.Value -> Url -> Navigation.Key -> ( Model, Cmd Msg )
 init flags _ _ =
     let
         defaultModel =
-            { assets = { yak = "" }
+            { assets = Assets.init
             , animatePressed = Animator.init All
             , puzzle = Puzzle.init
             , animateBackground = Animator.init Idle
@@ -97,9 +93,7 @@ init flags _ _ =
 flagsDecoder : D.Decoder Flags
 flagsDecoder =
     D.map Flags <|
-        D.field "assets" <|
-            D.map Assets
-                (D.field "Yak" D.string)
+        D.field "assets" Assets.decoder
 
 
 view : Model -> Browser.Document Msg
@@ -139,7 +133,7 @@ view model =
                     , E.spaceEvenly
                     , animateXY model.animateState
                     ]
-                    (viewImages model.assets model.puzzle)
+                    (viewImages model.puzzle)
                 , E.column
                     [ E.width E.fill
                     , E.height (E.fillPortion 1)
@@ -155,9 +149,9 @@ view model =
     }
 
 
-viewImages : Assets -> Puzzle -> List (Element msg)
-viewImages assets puzzle =
-    Puzzle.viewElements (viewImage assets) puzzle
+viewImages : Puzzle -> List (Element msg)
+viewImages puzzle =
+    Puzzle.viewElements viewImage puzzle
         |> chunksOfLeft 3
         |> List.map
             (E.row
@@ -169,8 +163,8 @@ viewImages assets puzzle =
             )
 
 
-viewImage : Assets -> Puzzle.Visibility -> Int -> Element msg
-viewImage assets visible _ =
+viewImage : Maybe Asset -> Puzzle.Visibility -> Int -> Element msg
+viewImage maybeAsset visible _ =
     case visible of
         Puzzle.Visible ->
             E.el
@@ -193,15 +187,7 @@ viewImage assets visible _ =
                     |> E.height
                 , E.clip
                 ]
-            <|
-                E.image
-                    [ E.centerX
-                    , E.centerY
-                    , Background.uncropped ""
-                    ]
-                    { src = assets.yak
-                    , description = assets.yak
-                    }
+                (Assets.view maybeAsset)
 
         Puzzle.Hidden ->
             E.el
@@ -224,8 +210,8 @@ viewNumPadRow animatePressed =
         ]
 
 
-viewNum : AnimatePressed -> Puzzle.Visibility -> Int -> Element Msg
-viewNum animatePressed _ n =
+viewNum : AnimatePressed -> Maybe a -> b -> Int -> Element Msg
+viewNum animatePressed _ _ n =
     E.el [ E.width E.fill, E.height E.fill ] <|
         Input.button
             [ Font.size 60
@@ -297,7 +283,7 @@ update msg model =
 
         GeneratePuzzle n ->
             ( model
-            , case Puzzle.generate model.puzzle of
+            , case Puzzle.generate model.assets model.puzzle of
                 Nothing ->
                     Cmd.none
 

@@ -7,18 +7,19 @@ module Puzzle exposing
     , viewElements
     )
 
+import Assets exposing (Asset, Assets)
 import Element as E exposing (Element)
 import Random
 import Random.List
 
 
 type Puzzle
-    = Puzzle (List Bool)
+    = Puzzle (Maybe Asset) (List Bool)
 
 
 init : Puzzle
 init =
-    Puzzle []
+    Puzzle Nothing []
 
 
 type Visibility
@@ -27,23 +28,23 @@ type Visibility
 
 
 viewElements :
-    (Visibility -> Int -> Element msg)
+    (Maybe Asset -> Visibility -> Int -> Element msg)
     -> Puzzle
     -> List (Element msg)
-viewElements f (Puzzle ns) =
+viewElements f (Puzzle maybeAsset ns) =
     List.indexedMap
         (\i v ->
             if v then
-                f Visible (i + 1)
+                f maybeAsset Visible (i + 1)
 
             else
-                f Hidden (i + 1)
+                f Nothing Hidden (i + 1)
         )
         ns
 
 
-generate : Puzzle -> Maybe (Random.Generator Puzzle)
-generate p =
+generate : Assets -> Puzzle -> Maybe (Random.Generator Puzzle)
+generate assets p =
     let
         n =
             correctAnswer p
@@ -53,15 +54,17 @@ generate p =
             Nothing
 
         x :: xs ->
-            Random.uniform x xs
-                |> Random.andThen
-                    (\y ->
-                        List.repeat y True
-                            ++ List.repeat (9 - y) False
-                            |> Random.List.shuffle
+            Just <|
+                Random.map2 Puzzle
+                    (Assets.random assets)
+                    (Random.uniform x xs
+                        |> Random.andThen
+                            (\y ->
+                                List.repeat y True
+                                    ++ List.repeat (9 - y) False
+                                    |> Random.List.shuffle
+                            )
                     )
-                |> Random.map Puzzle
-                |> Just
 
 
 correct : Int -> Puzzle -> Bool
@@ -70,5 +73,5 @@ correct n p =
 
 
 correctAnswer : Puzzle -> Int
-correctAnswer (Puzzle puzzle) =
+correctAnswer (Puzzle _ puzzle) =
     List.length (List.filter identity puzzle)
