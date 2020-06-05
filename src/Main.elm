@@ -111,7 +111,6 @@ view model =
                 ]
             , E.paddingXY 5 20
             , E.spacing 8
-            , E.clip
             , E.height E.fill
             , stateToColor
                 |> Animator.Inline.backgroundColor model.animateBackground
