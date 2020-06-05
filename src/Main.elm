@@ -109,20 +109,13 @@ view model =
                 [ Font.typeface "Patrick Hand"
                 , Font.sansSerif
                 ]
-            , E.paddingXY 5 50
+            , E.paddingXY 5 20
             , E.spacing 8
+            , E.clip
+            , E.height E.fill
             , stateToColor
                 |> Animator.Inline.backgroundColor model.animateBackground
                 |> E.htmlAttribute
-            , E.below <|
-                E.el
-                    [ E.height (E.px 44)
-                    , E.width E.fill
-                    , stateToColor
-                        |> Animator.Inline.backgroundColor model.animateBackground
-                        |> E.htmlAttribute
-                    ]
-                    E.none
             ]
             (E.column
                 [ E.fill
