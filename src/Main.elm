@@ -4,7 +4,7 @@ import Animator
 import Animator.Inline
 import Browser
 import Browser.Navigation as Navigation
-import Color
+import Color exposing (Color)
 import Dict exposing (Dict)
 import Element as E exposing (Element)
 import Element.Background as Background
@@ -115,7 +115,9 @@ view model =
             , E.paddingXY 5 50
             , E.spacing 8
             , E.clip
-            , animateBackgroundColor model.animateBackground
+            , stateToColor
+                |> Animator.Inline.backgroundColor model.animateBackground
+                |> E.htmlAttribute
             ]
             (E.column
                 [ E.fill
@@ -129,7 +131,15 @@ view model =
                     , Font.size 30
                     ]
                     (E.text "WIÄ VIEL?")
-                , animatedImages model
+                , E.column
+                    [ E.width E.fill
+                    , E.height (E.px 440)
+                    , E.centerX
+                    , E.centerY
+                    , E.spaceEvenly
+                    , animateXY model.animateState
+                    ]
+                    (viewImages model.assets model.puzzle)
                 , E.column
                     [ E.width E.fill
                     , E.height (E.fillPortion 1)
@@ -143,61 +153,6 @@ view model =
             )
         ]
     }
-
-
-animateBackgroundColor : AnimateState -> E.Attribute a
-animateBackgroundColor animateBackground =
-    E.htmlAttribute <|
-        Animator.Inline.backgroundColor animateBackground <|
-            \state ->
-                case state of
-                    Correct ->
-                        Color.lightGreen
-                            |> Color.toHsla
-                            |> (\c -> { c | lightness = 0.8 })
-                            |> Color.fromHsla
-
-                    Wrong ->
-                        Color.lightPurple
-                            |> Color.toHsla
-                            |> (\c -> { c | lightness = 0.8 })
-                            |> Color.fromHsla
-
-                    Idle ->
-                        backgroundColor
-                            |> E.toRgb
-                            |> Color.fromRgba
-
-
-animatedImages : Model -> Element msg
-animatedImages model =
-    E.column
-        [ E.width E.fill
-        , E.height (E.px 440)
-        , E.centerX
-        , E.centerY
-        , E.spaceEvenly
-        , E.htmlAttribute <|
-            Animator.Inline.xy model.animateState <|
-                \state ->
-                    case state of
-                        Correct ->
-                            { y =
-                                Animator.at -570
-                                    |> Animator.arriveSmoothly 1
-                                    |> Animator.withWobble 0
-                            , x = Animator.at 0
-                            }
-
-                        _ ->
-                            { y =
-                                Animator.at 0
-                                    |> Animator.arriveSmoothly 1
-                                    |> Animator.withWobble 0
-                            , x = Animator.at 0
-                            }
-        ]
-        (viewImages model.assets model.puzzle)
 
 
 viewImages : Assets -> Puzzle -> List (Element msg)
@@ -278,87 +233,23 @@ viewNum animatePressed _ n =
             , E.centerY
             , E.width E.fill
             , E.height E.fill
-            , E.htmlAttribute <|
-                Animator.Inline.backgroundColor animatePressed <|
-                    \maybePressed ->
-                        case maybePressed of
-                            Solved x ->
-                                if x == n then
-                                    Color.lightGreen
-
-                                else
-                                    Color.lightPurple
-
-                            Attempts set ->
-                                if Set.member n set then
-                                    Color.lightPurple
-
-                                else
-                                    Color.lightBlue
-
-                            _ ->
-                                Color.lightBlue
-            , E.htmlAttribute <|
-                Animator.Inline.borderColor animatePressed <|
-                    \maybePressed ->
-                        case maybePressed of
-                            Attempts set ->
-                                if Set.member n set then
-                                    Color.purple
-
-                                else
-                                    Color.blue
-
-                            Solved x ->
-                                if x == n then
-                                    Color.green
-
-                                else
-                                    Color.purple
-
-                            _ ->
-                                Color.blue
             , Border.solid
             , Border.rounded 18
             , Border.width 3
-            , E.htmlAttribute <|
-                Animator.Inline.opacity animatePressed <|
-                    \maybePressed ->
-                        case maybePressed of
-                            All ->
-                                Animator.at 0.5
-
-                            Solved x ->
-                                if x == n then
-                                    Animator.at 1
-
-                                else
-                                    Animator.at 0.2
-
-                            Attempts set ->
-                                if Set.member n set then
-                                    Animator.at 0.5
-
-                                else
-                                    Animator.at 1
-            , E.htmlAttribute <|
-                Animator.Inline.xy animatePressed <|
-                    \maybePressed ->
-                        case maybePressed of
-                            All ->
-                                { x = Animator.at 0, y = Animator.at 8 }
-
-                            Solved x ->
-                                { x = Animator.at 0, y = Animator.at 8 }
-
-                            Attempts set ->
-                                if Set.member n set then
-                                    { x = Animator.at 0, y = Animator.at 8 }
-
-                                else
-                                    { x = Animator.at 0, y = Animator.at 0 }
-            , E.htmlAttribute <|
-                Animator.Inline.style animatePressed
+            , (pressedToStyle n >> .lightColor)
+                |> Animator.Inline.backgroundColor animatePressed
+                |> E.htmlAttribute
+            , (pressedToStyle n >> .darkColor)
+                |> Animator.Inline.borderColor animatePressed
+                |> E.htmlAttribute
+            , (pressedToStyle n >> .opacity)
+                |> Animator.Inline.opacity animatePressed
+                |> E.htmlAttribute
+            , (pressedToStyle n >> .xy)
+                |> Animator.Inline.xy animatePressed
+                |> E.htmlAttribute
+            , (pressedToStyle n >> .shadow)
+                |> Animator.Inline.style animatePressed
                     "box-shadow"
                     (\float ->
                         let
@@ -367,21 +258,7 @@ viewNum animatePressed _ n =
                         in
                         "0px " ++ str ++ "px 0px 0px " ++ Color.toCssString Color.blue
                     )
-                <|
-                    \maybePressed ->
-                        case maybePressed of
-                            All ->
-                                Animator.at 0
-
-                            Solved x ->
-                                Animator.at 0
-
-                            Attempts set ->
-                                if Set.member n set then
-                                    Animator.at 0
-
-                                else
-                                    Animator.at 8
+                |> E.htmlAttribute
             ]
             { onPress =
                 case Animator.current animatePressed of
@@ -557,3 +434,102 @@ chunksOfLeft k xs =
 
     else
         [ xs ]
+
+
+animateXY : AnimateState -> E.Attribute a
+animateXY animateState =
+    E.htmlAttribute <|
+        Animator.Inline.xy animateState <|
+            \state ->
+                case state of
+                    Correct ->
+                        { y =
+                            Animator.at -570
+                                |> Animator.arriveSmoothly 1
+                                |> Animator.withWobble 0
+                        , x = Animator.at 0
+                        }
+
+                    _ ->
+                        { y =
+                            Animator.at 0
+                                |> Animator.arriveSmoothly 1
+                                |> Animator.withWobble 0
+                        , x = Animator.at 0
+                        }
+
+
+stateToColor : State -> Color
+stateToColor state =
+    case state of
+        Correct ->
+            Color.lightGreen
+                |> Color.toHsla
+                |> (\c -> { c | lightness = 0.8 })
+                |> Color.fromHsla
+
+        Wrong ->
+            Color.lightPurple
+                |> Color.toHsla
+                |> (\c -> { c | lightness = 0.8 })
+                |> Color.fromHsla
+
+        Idle ->
+            backgroundColor
+                |> E.toRgb
+                |> Color.fromRgba
+
+
+pressedToStyle :
+    Int
+    -> Pressed
+    ->
+        { lightColor : Color
+        , darkColor : Color
+        , opacity : Animator.Movement
+        , xy : { x : Animator.Movement, y : Animator.Movement }
+        , shadow : Animator.Movement
+        }
+pressedToStyle n maybePressed =
+    case maybePressed of
+        Solved x ->
+            if x == n then
+                { lightColor = Color.lightGreen
+                , darkColor = Color.green
+                , opacity = Animator.at 1
+                , xy = { x = Animator.at 0, y = Animator.at 8 }
+                , shadow = Animator.at 0
+                }
+
+            else
+                { lightColor = Color.lightPurple
+                , darkColor = Color.purple
+                , opacity = Animator.at 0.2
+                , xy = { x = Animator.at 0, y = Animator.at 8 }
+                , shadow = Animator.at 0
+                }
+
+        Attempts set ->
+            if Set.member n set then
+                { lightColor = Color.lightPurple
+                , darkColor = Color.purple
+                , opacity = Animator.at 0.5
+                , xy = { x = Animator.at 0, y = Animator.at 8 }
+                , shadow = Animator.at 0
+                }
+
+            else
+                { lightColor = Color.lightBlue
+                , darkColor = Color.blue
+                , opacity = Animator.at 1
+                , xy = { x = Animator.at 0, y = Animator.at 0 }
+                , shadow = Animator.at 8
+                }
+
+        All ->
+            { lightColor = Color.lightBlue
+            , darkColor = Color.blue
+            , opacity = Animator.at 0.5
+            , xy = { x = Animator.at 0, y = Animator.at 8 }
+            , shadow = Animator.at 0
+            }
