@@ -30,15 +30,17 @@ type Visibility
 viewElements :
     (Maybe Asset -> Visibility -> Int -> Element msg)
     -> Puzzle
-    -> List (Element msg)
+    -> List ( String, Element msg )
 viewElements f (Puzzle maybeAsset ns) =
     List.indexedMap
         (\i v ->
-            if v then
+            ( String.fromInt i ++ Assets.name maybeAsset
+            , if v then
                 f maybeAsset Visible (i + 1)
 
-            else
+              else
                 f Nothing Hidden (i + 1)
+            )
         )
         ns
 

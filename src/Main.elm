@@ -11,6 +11,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Element.Keyed as EK
 import Html.Attributes as Attr
 import Json.Decode as D
 import Process
@@ -154,7 +155,7 @@ viewImages puzzle =
     Puzzle.viewElements viewImage puzzle
         |> chunksOfLeft 3
         |> List.map
-            (E.row
+            (EK.row
                 [ E.centerX
                 , E.centerY
                 , E.spacing 8
@@ -200,9 +201,9 @@ viewImage maybeAsset visible _ =
                 E.none
 
 
-viewNumPadRow : AnimatePressed -> List (Element msg) -> Element msg
+viewNumPadRow : AnimatePressed -> List ( String, Element msg ) -> Element msg
 viewNumPadRow animatePressed =
-    E.row
+    EK.row
         [ E.width E.fill
         , E.height E.fill
         , E.spacing 8

@@ -1,4 +1,4 @@
-module Assets exposing (Asset, Assets, decoder, init, random, view)
+module Assets exposing (Asset, Assets, decoder, init, name, random, view)
 
 import Element as E exposing (Element)
 import Element.Background as Background
@@ -82,15 +82,25 @@ view maybeAsset =
         Nothing ->
             E.none
 
-        Just (Asset name src) ->
+        Just (Asset n src) ->
             E.image
                 [ E.centerX
                 , E.centerY
                 , Background.uncropped ""
                 ]
                 { src = src
-                , description = name
+                , description = n
                 }
+
+
+name : Maybe Asset -> String
+name maybeAsset =
+    case maybeAsset of
+        Just (Asset n _) ->
+            n
+
+        Nothing ->
+            ""
 
 
 init : Assets
@@ -123,9 +133,9 @@ decoder =
 
 
 assetDecoder : String -> D.Decoder Asset
-assetDecoder name =
-    D.field name D.string
-        |> D.map (Asset name)
+assetDecoder n =
+    D.field n D.string
+        |> D.map (Asset n)
 
 
 andMap : D.Decoder a -> D.Decoder (a -> b) -> D.Decoder b
