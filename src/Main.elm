@@ -382,6 +382,7 @@ update msg model =
                                 , Animator.event Animator.verySlowly Correct
                                 ]
                                 model.animateState
+                        , showSettings = False
                       }
                     , Task.perform (\_ -> GeneratePuzzle n) (Process.sleep 3500)
                     )
@@ -397,6 +398,7 @@ update msg model =
                                 , Animator.event Animator.verySlowly Idle
                                 ]
                                 model.animateBackground
+                        , showSettings = False
                       }
                     , Cmd.none
                     )
