@@ -83,14 +83,16 @@ view maybeAsset =
             E.none
 
         Just (Asset n src) ->
-            E.image
+            E.el
                 [ E.centerX
                 , E.centerY
-                , Background.uncropped ""
+                , E.fill
+                    |> E.height
+                , E.fill
+                    |> E.width
+                , Background.uncropped src
                 ]
-                { src = src
-                , description = n
-                }
+                E.none
 
 
 name : Maybe Asset -> String

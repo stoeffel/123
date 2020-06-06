@@ -122,6 +122,7 @@ view model =
                     |> E.width
                 , E.height E.fill
                 , E.centerX
+                , E.spacing 8
                 ]
                 [ E.row
                     [ E.width E.fill
@@ -137,18 +138,15 @@ view model =
                     ]
                 , E.column
                     [ E.width E.fill
-                    , E.height E.fill
+                    , E.height (E.fillPortion 4)
                     , E.centerX
                     , E.centerY
-                    , E.spaceEvenly
                     , animateXY model.animateState
                     ]
                     (viewImages model.puzzle)
                 , E.column
                     [ E.width E.fill
-                    , E.fill
-                        |> E.maximum 440
-                        |> E.height
+                    , E.height (E.fillPortion 2)
                     , E.centerY
                     ]
                     (model.puzzle
@@ -190,43 +188,30 @@ viewImages puzzle =
                 , E.centerY
                 , E.spacing 8
                 , E.padding 8
+                , E.height (E.fillPortion 1)
+                , E.width E.fill
                 ]
             )
 
 
 viewImage : Int -> Maybe Asset -> Puzzle.Visibility -> Int -> Element msg
 viewImage chunks maybeAsset visible _ =
-    let
-        size =
-            E.px (330 // chunks)
-    in
     case visible of
         Puzzle.Visible ->
             E.el
-                [ E.htmlAttribute (Attr.style "border-radius" "50%")
-                , Border.innerGlow
-                    (Color.grey
-                        |> Color.toRgba
-                        |> E.fromRgb
-                    )
-                    3
-                , Color.lightGrey
-                    |> Color.toRgba
-                    |> E.fromRgb
-                    |> Background.color
-                , E.centerX
+                [ E.centerX
                 , E.padding 2
-                , E.width size
-                , E.height size
                 , E.clip
+                , E.width E.fill
+                , E.height E.fill
                 ]
                 (Assets.view maybeAsset)
 
         Puzzle.Hidden ->
             E.el
                 [ E.padding 2
-                , E.width size
-                , E.height size
+                , E.width E.fill
+                , E.height E.fill
                 ]
                 E.none
 
@@ -247,7 +232,7 @@ viewNum : AnimatePressed -> Maybe a -> b -> Int -> Element Msg
 viewNum animatePressed _ _ n =
     E.el [ E.width E.fill, E.height E.fill ] <|
         Input.button
-            [ Font.size 60
+            [ Font.size 40
             , E.centerX
             , E.centerY
             , E.width E.fill
