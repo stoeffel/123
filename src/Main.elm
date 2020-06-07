@@ -167,7 +167,21 @@ viewSettingsButton showSettings value =
         , E.spacing 10
         , E.below <|
             if showSettings then
-                E.el [ E.alignRight ]
+                E.el
+                    [ E.alignRight
+                    , Color.lightBlue
+                        |> Color.toRgba
+                        |> E.fromRgb
+                        |> Background.color
+                    , E.padding 8
+                    , Border.solid
+                    , Border.width 1
+                    , Color.blue
+                        |> Color.toRgba
+                        |> E.fromRgb
+                        |> Border.color
+                    , Border.rounded 8
+                    ]
                     (Puzzle.settings value AdjustValue)
 
             else

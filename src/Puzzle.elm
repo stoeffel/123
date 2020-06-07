@@ -87,7 +87,7 @@ settings value toMsg =
         [ E.height (E.px 30)
         , E.behindContent
             (E.el
-                [ E.width (E.px 100)
+                [ E.width E.fill
                 , E.height (E.px 2)
                 , E.centerY
                 , Color.blue
@@ -125,7 +125,7 @@ chunks (Puzzle n _ _) =
             3
 
         18 ->
-            6
+            4
 
         _ ->
             3
