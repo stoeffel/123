@@ -146,8 +146,8 @@ view model =
                     (viewImages model.puzzle)
                 , E.column
                     [ E.width E.fill
-                    , E.height (E.fillPortion 2)
-                    , E.centerY
+                    , E.height E.fill
+                    , E.centerX
                     ]
                     (model.puzzle
                         |> Puzzle.viewElements (viewNum model.animatePressed)
@@ -186,7 +186,6 @@ viewImages puzzle =
             (EK.row
                 [ E.centerX
                 , E.centerY
-                , E.spacing 8
                 , E.padding 8
                 , E.height (E.fillPortion 1)
                 , E.width E.fill
@@ -196,23 +195,18 @@ viewImages puzzle =
 
 viewImage : Int -> Maybe Asset -> Puzzle.Visibility -> Int -> Element msg
 viewImage chunks maybeAsset visible _ =
-    case visible of
-        Puzzle.Visible ->
-            E.el
-                [ E.centerX
-                , E.padding 2
-                , E.clip
-                , E.width E.fill
-                , E.height E.fill
-                ]
-                (Assets.view maybeAsset)
+    E.el
+        [ E.centerX
+        , E.clip
+        , E.width E.fill
+        , E.height E.fill
+        ]
+    <|
+        case visible of
+            Puzzle.Visible ->
+                Assets.view maybeAsset
 
-        Puzzle.Hidden ->
-            E.el
-                [ E.padding 2
-                , E.width E.fill
-                , E.height E.fill
-                ]
+            Puzzle.Hidden ->
                 E.none
 
 

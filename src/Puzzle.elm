@@ -113,7 +113,7 @@ chunks : Puzzle -> Int
 chunks (Puzzle n _ _) =
     case n of
         6 ->
-            3
+            2
 
         9 ->
             3
@@ -122,10 +122,10 @@ chunks (Puzzle n _ _) =
             4
 
         15 ->
-            4
+            3
 
         18 ->
-            5
+            6
 
         _ ->
             3
