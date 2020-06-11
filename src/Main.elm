@@ -14,11 +14,17 @@ import Element.Input as Input
 import Element.Keyed as EK
 import Html.Attributes as Attr
 import Json.Decode as D
+import Particle exposing (Particle)
+import Particle.System as System exposing (System)
 import Process
 import Puzzle exposing (Puzzle)
-import Random
+import Random exposing (Generator)
+import Random.Extra
+import Random.Float
 import Random.List
 import Set exposing (Set)
+import Svg exposing (Svg)
+import Svg.Attributes as SAttrs
 import Task
 import Time
 import Url exposing (Url)
@@ -31,6 +37,7 @@ type alias Model =
     , animateState : AnimateState
     , puzzle : Puzzle
     , showSettings : Bool
+    , fireworks : System Firework
     }
 
 
@@ -81,6 +88,7 @@ init flags _ _ =
             , animateBackground = Animator.init Idle
             , animateState = Animator.init Correct
             , showSettings = False
+            , fireworks = System.init (Random.initialSeed 0)
             }
     in
     case D.decodeValue flagsDecoder flags of
@@ -115,6 +123,20 @@ view model =
             , stateToColor
                 |> Animator.Inline.backgroundColor model.animateBackground
                 |> E.htmlAttribute
+            , case Animator.current model.animateBackground of
+                Correct ->
+                    System.view viewFirework
+                        [ Attr.style "width" "100%"
+                        , Attr.style "height" "100%"
+                        , Attr.style "background-color" "transparent"
+                        , SAttrs.viewBox "0 0 300 600"
+                        ]
+                        model.fireworks
+                        |> E.html
+                        |> E.inFront
+
+                _ ->
+                    E.clip
             ]
             (E.column
                 [ E.fill
@@ -301,6 +323,9 @@ type Msg
     | GeneratePuzzle Int
     | ToggleSettings
     | AdjustValue Int
+    | ParticleMsg (System.Msg Firework)
+    | TriggerBurst
+    | Burst
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -377,7 +402,10 @@ update msg model =
                                 model.animateState
                         , showSettings = False
                       }
-                    , Task.perform (\_ -> GeneratePuzzle n) (Process.sleep 3500)
+                    , Cmd.batch
+                        [ Task.perform (\_ -> GeneratePuzzle n) (Process.sleep 3500)
+                        , Task.perform (\_ -> TriggerBurst) (Process.sleep 0)
+                        ]
                     )
 
                 _ ->
@@ -396,6 +424,38 @@ update msg model =
                     , Cmd.none
                     )
 
+        TriggerBurst ->
+            ( model
+            , Cmd.batch
+                [ Task.perform (\_ -> Burst) (Process.sleep 0)
+                , Task.perform (\_ -> Burst) (Process.sleep 50)
+                , Task.perform (\_ -> Burst) (Process.sleep 100)
+                , Task.perform (\_ -> Burst) (Process.sleep 150)
+                , Task.perform (\_ -> Burst) (Process.sleep 200)
+                , Task.perform (\_ -> Burst) (Process.sleep 250)
+                , Task.perform (\_ -> Burst) (Process.sleep 300)
+                , Task.perform (\_ -> Burst) (Process.sleep 350)
+                , Task.perform (\_ -> Burst) (Process.sleep 400)
+                ]
+            )
+
+        Burst ->
+            ( { model
+                | fireworks =
+                    System.burst
+                        (Random.list 1
+                            (Random.Extra.andThen3 fireworkAt
+                                (Random.uniform Color.red [ Color.yellow, Color.purple, Color.blue, Color.white ])
+                                (Random.float 0 500)
+                                (Random.float 0 300)
+                            )
+                            |> Random.map List.concat
+                        )
+                        model.fireworks
+              }
+            , Cmd.none
+            )
+
         ToggleSettings ->
             ( { model | showSettings = not model.showSettings }, Cmd.none )
 
@@ -407,10 +467,16 @@ update msg model =
         Tick newTime ->
             ( Animator.update newTime animator model, Cmd.none )
 
+        ParticleMsg inner ->
+            ( { model | fireworks = System.update inner model.fireworks }, Cmd.none )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Animator.toSubscription Tick model animator
+    Sub.batch
+        [ Animator.toSubscription Tick model animator
+        , System.sub [] ParticleMsg model.fireworks
+        ]
 
 
 animator : Animator.Animator Model
@@ -431,6 +497,82 @@ animator =
             (\newAnimatePressed model ->
                 { model | animatePressed = newAnimatePressed }
             )
+
+
+type Firework
+    = Fizzler Color
+
+
+fizzler : Color -> Generator (Particle Firework)
+fizzler color =
+    Particle.init (Random.constant (Fizzler color))
+        |> Particle.withDirection (Random.map degrees (Random.float 0 360))
+        |> Particle.withSpeed (Random.map (clamp 0 200) (Random.Float.normal 100 100))
+        |> Particle.withLifetime (Random.Float.normal 1.25 0.1)
+
+
+fireworkAt : Color -> Float -> Float -> Generator (List (Particle Firework))
+fireworkAt color x y =
+    fizzler color
+        |> Particle.withLocation (Random.constant { x = x, y = y })
+        |> Particle.withGravity 50
+        |> Particle.withDrag
+            (\_ ->
+                { coefficient = 1
+                , density = 0.015
+                , area = 2
+                }
+            )
+        |> Random.list 80
+
+
+viewFirework : Particle Firework -> Svg msg
+viewFirework particle =
+    case Particle.data particle of
+        Fizzler color ->
+            let
+                length =
+                    max 2 (Particle.speed particle / 15)
+
+                { hue, saturation, lightness } =
+                    Color.toHsla color
+
+                maxLuminance =
+                    0.6
+
+                luminanceDelta =
+                    maxLuminance - lightness
+
+                lifetime =
+                    Particle.lifetimePercent particle
+
+                opacity =
+                    if lifetime < 0.1 then
+                        lifetime * 10
+
+                    else
+                        1
+            in
+            Svg.ellipse
+                [ -- location within the burst
+                  SAttrs.cx (String.fromFloat (length / 2))
+                , SAttrs.cy "0"
+
+                -- size, smeared by motion
+                , SAttrs.rx (String.fromFloat length)
+                , SAttrs.ry "2"
+                , SAttrs.transform ("rotate(" ++ String.fromFloat (Particle.directionDegrees particle) ++ ")")
+
+                -- color!
+                , SAttrs.opacity (String.fromFloat opacity)
+                , maxLuminance
+                    - luminanceDelta
+                    * (1 - lifetime)
+                    |> Color.hsl hue saturation
+                    |> Color.toCssString
+                    |> SAttrs.fill
+                ]
+                []
 
 
 onUrlRequest : Browser.UrlRequest -> Msg
